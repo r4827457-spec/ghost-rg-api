@@ -789,19 +789,6 @@ def signal_handler(sig, frame):
     cleanup()
     sys.exit(0)
 
-# Vercel startup (no __main__)
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-atexit.register(cleanup)
-
-if os.getenv("RENDER") != "true":
-    try:
-        accounts = load_accounts("accounts.json")
-        for account_id, password in accounts.items():
-            client = TcpBotConnectMain(account_id, password)
-            clients[account_id] = client
-            threading.Thread(target=client.run, daemon=True).start()
-            time.sleep(2)
-    except FileNotFoundError:
-        print("No accounts file found. Starting without preloaded accounts.")
+# === Startup ===
+if __name__ == "__main__":
+    app.run(debug=True)
