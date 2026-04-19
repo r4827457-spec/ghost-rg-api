@@ -515,6 +515,187 @@ class TcpBotConnectMain:
                     f"[{self.account_id}] Executing /XRRR for team code {team_code} with name {account_name}"
                 )
                 sys.stdout.flush()
+                self.socket_client.send(
+                    GenJoinSquadsPacket(team_code, self.key, self.iv)
+                )
+                time.sleep(0.5)
+                start_time = time.time()
+                got_0500 = False
+                idT = None
+                sq = None
+
+                while not got_0500 and (time.time() - start_time) < 10:
+                    if (
+                        self.DaTa2
+                        and len(self.DaTa2.hex()) >= 4
+                        and "0500" in self.DaTa2.hex()[0:4]
+                    ):
+                        try:
+                            self.dT = json.loads(
+                                DeCode_PackEt(self.DaTa2.hex()[10:])
+                            )
+                            if (
+                                "5" in self.dT
+                                and "data" in self.dT["5"]
+                                and "31" in self.dT["5"]["data"]
+                                and "1" in self.dT["5"]["data"]
+                            ):
+                                sq = self.dT["5"]["data"]["31"]["data"]
+                                idT = self.dT["5"]["data"]["1"]["data"]
+                                got_0500 = True
+                                print(
+                                    f"[{self.account_id}] Got 0500 with ID: {idT}"
+                                )
+                                break
+                        except Exception as parse_err:
+                            print(
+                                f"[{self.account_id}] Error parsing 0500: {parse_err}"
+                            )
+                    time.sleep(0.1)
+
+                if not got_0500:
+                    return f"Failed to get 0500 for team code {team_code} within timeout"
+
+                self.socket_client.send(ExiT("000000", self.key, self.iv))
+                time.sleep(0.1)
+
+                self.socket_client.send(
+                    ghost_pakcet(idT, account_name, sq, self.key, self.iv)
+                )
+                time.sleep(0.1)
+                self.socket_client.send(ExiT("000000", self.key, self.iv))
+
+                return f"Ghost {account_name} successfully joined squad {idT} (original code {team_code})"
+
+            except Exception as e:
+                print(f"[{self.account_id}] Error in execute_command: {e}")
+                return f"Error executing command: {e}"
+        else:
+            return f"Unknown command: {command}"
+
+def load_accounts(file_path):
+    with open(file_path, "r") as file:
+        return json.load(file)
+
+def cleanup():
+    global shutting_down
+    shutting_down = True
+    print("Shutting down all clients...")
+    for account_id, client in list(clients.items()):
+        client.stop()
+        del clients[account_id]
+    print("Cleanup completed")
+
+@app.route("/")
+def home():
+    return "OK", 200
+
+@app.route("/start_client", methods=["GET"])
+def start_client():
+    if shutting_down:
+        return jsonify({"error": "Server is shutting down"}), 503
+
+    account_id = request.args.get("account_id")
+    password = request.args.get("password")
+
+    if not account_id or not password:
+        return jsonify({"error": "Account ID and password are required"}), 400
+
+    if account_id in clients:
+        return jsonify({"error": "Client already running"}), 400
+
+    client = TcpBotConnectMain(account_id, password)
+    clients[account_id] = client
+
+    client_thread = threading.Thread(target=client.run)
+    client_thread.daemon = True
+    client_thread.start()
+
+    return jsonify({"message": f"Client {account_id} started successfully"}), 200
+
+@app.route("/stop_client", methods=["GET"])
+def stop_client():
+    if shutting_down:
+        return jsonify({"error": "Server is shutting down"}), 503
+
+    account_id = request.args.get("account_id")
+
+    if not account_id:
+        return jsonify({"error": "Account ID is required"}), 400
+
+    if account_id not in clients:
+        return jsonify({"error": "Client not found"}), 404
+
+    client = clients[account_id]
+    client.stop()
+    del clients[account_id]
+
+    return jsonify({"message": f"Client {account_id} stopped successfully"}), 200
+
+@app.route("/execute_command", methods=["GET"])
+def execute_command():
+    if shutting_down:
+        return jsonify({"error": "Server is shutting down"}), 503
+
+    account_id = request.args.get("account_id")
+    command = request.args.get("command")
+    client_id = request.args.get("client_id")
+    name = request.args.get("name")
+
+    if not account_id or not command:
+        return jsonify({"error": "Account ID and command are required"}), 400
+
+    if account_id not in clients:
+        return jsonify({"error": "Client not found"}), 404
+
+    client = clients[account_id]
+
+    args = []
+    if client_id:
+        try:
+            args.append(int(client_id))
+        except ValueError:
+            return jsonify({"error": "Invalid client_id format"}), 400
+
+    if name:
+        args.append(name)
+
+    result = client.execute_command(command, *args)
+
+    return jsonify({"result": result}), 200
+
+@app.route("/list_clients", methods=["GET"])
+def list_clients():
+    return jsonify({"clients": list(clients.keys())}), 200
+
+@app.route("/execute_command_all", methods=["GET"])
+def execute_command_all():
+    if shutting_down:
+        return jsonify({"error": "Server is shutting down"}), 503
+
+    command = request.args.get("command")
+    ghost_names_param = request.args.get("ghost_names", None)
+
+    if not command:
+        return jsonify({"error": "Command parameter is required"}), 400
+def execute_command(self, command, *args):
+        if command == "/XRRR":
+            try:
+                if not self.socket_client or not self.is_socket_connected(
+                    self.socket_client
+                ):
+                    return "Socket not connected, please wait for connection..."
+
+                team_code = args[0] if len(args) > 0 else None
+                account_name = args[1] if len(args) > 1 else "UnknownGhost"
+
+                if not team_code:
+                    return "No team code provided for /XRRR"
+
+                print(
+                    f"[{self.account_id}] Executing /XRRR for team code {team_code} with name {account_name}"
+                )
+                sys.stdout.flush()
 
                 self.socket_client.send(
                     GenJoinSquadsPacket(team_code, self.key, self.iv)
@@ -789,6 +970,22 @@ def signal_handler(sig, frame):
     cleanup()
     sys.exit(0)
 
-# === Startup ===
 if __name__ == "__main__":
-    app.run(debug=True)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    atexit.register(cleanup)
+
+    if os.getenv("RENDER") != "true":
+        try:
+            accounts = load_accounts("accounts.json")
+            for account_id, password in accounts.items():
+                client = TcpBotConnectMain(account_id, password)
+                clients[account_id] = client
+                threading.Thread(target=client.run, daemon=True).start()
+                time.sleep(2)
+        except FileNotFoundError:
+            print("No accounts file found. Starting without preloaded accounts.")
+
+    port = int(os.environ.get("PORT", 5000))
+
+    app.run(host="0.0.0.0", port=port, debug=False)
